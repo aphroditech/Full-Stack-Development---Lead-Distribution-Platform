@@ -4,6 +4,17 @@ import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../lib/http-error";
 import { slugify } from "../../utils/slug";
 
+// Slugs that would collide with admin/frontend routes.
+const RESERVED_SLUGS = new Set([
+  "login",
+  "brokers",
+  "form",
+  "distribution",
+  "leads",
+  "api",
+  "dashboard",
+]);
+
 function serializeForm(form: Form & { distribution?: { id: string } | null }) {
   return {
     id: form.id,
@@ -35,6 +46,12 @@ export const createForm: RequestHandler = async (req, res) => {
     throw HttpError.badRequest(
       "Could not derive a URL slug from the form name — please provide one.",
       "INVALID_SLUG",
+    );
+  }
+  if (RESERVED_SLUGS.has(slug)) {
+    throw HttpError.badRequest(
+      `The slug "${slug}" is reserved. Please choose a different one.`,
+      "RESERVED_SLUG",
     );
   }
 

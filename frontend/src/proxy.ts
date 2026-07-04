@@ -1,68 +1,31 @@
-import { auth } from "@/lib/auth";
-// import type { AppRole } from "@/lib/auth/modules/authorization/permissions";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_COOKIE } from "@/lib/config";
 
-const AUTH_ONLY_PATHS = ["/auth/sign-in", "/auth/sign-up"];
-const SESSION_COOKIE_NAME =
-  process.env.NODE_ENV === "development"
-    ? "better-auth.session_token"
-    : "__Secure-better-auth.session_token";
-// const ROLE_PROTECTED: { prefix: string; requiredRole: AppRole }[] = [
-//   { prefix: "/dashboard/settings", requiredRole: "admin" },
-//   { prefix: "/dashboard/users", requiredRole: "admin" },
-// ];
+// Admin (protected) routes. Everything else — /login and public form slugs — is open.
+const PROTECTED_EXACT = ["/"];
+const PROTECTED_PREFIX = ["/brokers", "/form", "/distribution", "/leads"];
 
-export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const callbackUrl = `${pathname}${request.nextUrl.search}`;
-  const isAuthOnly = AUTH_ONLY_PATHS.some((path) => pathname.startsWith(path));
-  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+export function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-  if (!sessionCookie) {
-    if (!isAuthOnly) {
-      const url = request.nextUrl.clone();
-      url.searchParams.set("callbackUrl", callbackUrl);
-      url.pathname = "/auth/sign-in";
-      return NextResponse.redirect(url);
-    }
+  const isProtected =
+    PROTECTED_EXACT.includes(pathname) ||
+    PROTECTED_PREFIX.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-    return NextResponse.next();
-  }
+  if (!isProtected) return NextResponse.next();
 
-  try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.session && !isAuthOnly) {
-      const url = request.nextUrl.clone();
-      url.searchParams.set("callbackUrl", callbackUrl);
-      url.pathname = "/auth/sign-in";
-      return NextResponse.redirect(url);
-    }
-
-    // const sessionRole = (session?.user as { role?: string } | undefined)?.role;
-
-    // if (roleProtectedRoute && sessionRole !== roleProtectedRoute.requiredRole) {
-    //   return NextResponse.redirect(new URL("/", request.url));
-    // }
-
-    if (isAuthOnly && session?.session) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-  } catch (error) {
-    console.error(error);
-    if (!isAuthOnly) {
-      const url = request.nextUrl.clone();
-      url.searchParams.set("callbackUrl", callbackUrl);
-      url.pathname = "/auth/sign-in";
-      return NextResponse.redirect(url);
-    }
+  const token = req.cookies.get(AUTH_COOKIE)?.value;
+  if (!token) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  // Skip Next internals and static assets (anything with a file extension).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|.*\\..*).*)"],
 };
