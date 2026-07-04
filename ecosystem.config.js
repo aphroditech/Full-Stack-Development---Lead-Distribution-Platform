@@ -17,12 +17,12 @@ module.exports = {
     {
       name: "ld-frontend",
       cwd: "./frontend",
-      script: "node_modules/next/dist/bin/next",
-      args: "start -p 8169 -H 0.0.0.0",
+      script: "server.js",
       instances: 1,
       autorestart: true,
       env: {
         NODE_ENV: "production",
+        PORT: "8169",
         BACKEND_URL: "http://127.0.0.1:8170",
       },
     },

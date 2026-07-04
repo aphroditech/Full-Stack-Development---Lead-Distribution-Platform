@@ -1,17 +1,46 @@
 "use client";
 
-import { useActionState } from "react";
-import { submitLeadAction, type SubmitState } from "./actions";
-import { Field, Input, SubmitButton } from "@/components/ui/form";
-
-const initialState: SubmitState = {};
+import { useState, type FormEvent } from "react";
+import { Button, Field, Input } from "@/components/ui/form";
 
 export function PublicLeadForm({ slug }: { slug: string }) {
-  const action = submitLeadAction.bind(null, slug);
-  const [state, formAction] = useActionState(action, initialState);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [result, setResult] = useState<{ status?: string; message?: string } | null>(null);
+  const [error, setError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
 
-  if (state.ok) {
-    const isDuplicate = state.status === "duplicate";
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(undefined);
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      setError("Name, email and phone are all required.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/public/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug, name, email, phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error?.message ?? "Something went wrong. Please try again.");
+      } else {
+        setResult({ status: data?.lead?.status, message: data?.message });
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (result) {
+    const isDuplicate = result.status === "duplicate";
     return (
       <div
         className={
@@ -23,34 +52,38 @@ export function PublicLeadForm({ slug }: { slug: string }) {
         <p className="text-lg font-semibold">
           {isDuplicate ? "Already registered" : "Thank you!"}
         </p>
-        <p className="mt-1 text-sm">
-          {state.message ?? "Your details have been received."}
-        </p>
+        <p className="mt-1 text-sm">{result.message ?? "Your details have been received."}</p>
       </div>
     );
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <Field label="Full name" htmlFor="name">
-        <Input id="name" name="name" required placeholder="Jane Doe" />
+        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
       </Field>
       <Field label="Email" htmlFor="email">
-        <Input id="email" name="email" type="email" required placeholder="jane@example.com" />
+        <Input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="jane@example.com"
+        />
       </Field>
       <Field label="Phone" htmlFor="phone">
-        <Input id="phone" name="phone" required placeholder="+1 555 123 4567" />
+        <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555 123 4567" />
       </Field>
 
-      {state.error && (
+      {error && (
         <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
-          {state.error}
+          {error}
         </p>
       )}
 
-      <SubmitButton pendingLabel="Submitting..." className="w-full">
-        Submit
-      </SubmitButton>
+      <Button type="submit" disabled={submitting} className="w-full">
+        {submitting ? "Submitting..." : "Submit"}
+      </Button>
     </form>
   );
 }
