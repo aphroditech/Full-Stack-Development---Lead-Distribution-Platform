@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { AUTH_COOKIE, isProd } from "./config";
+import { AUTH_COOKIE, COOKIE_SECURE } from "./config";
 import { backendFetch, readError } from "./backend";
 
 export interface LoginState {
@@ -33,7 +33,7 @@ export async function loginAction(
   const data = (await res.json()) as { token: string };
   (await cookies()).set(AUTH_COOKIE, data.token, {
     httpOnly: true,
-    secure: isProd,
+    secure: COOKIE_SECURE,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
