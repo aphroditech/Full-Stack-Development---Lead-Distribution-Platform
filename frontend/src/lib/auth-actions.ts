@@ -42,7 +42,12 @@ export async function loginAction(
   redirect("/");
 }
 
+/**
+ * Clear the admin session cookie. The caller (client) performs a full-page
+ * navigation to /login afterwards — a hard load guarantees the login page is
+ * freshly rendered and interactive (a soft router navigation after a server
+ * action can leave the target client form un-hydrated until a manual refresh).
+ */
 export async function logoutAction(): Promise<void> {
   (await cookies()).delete(AUTH_COOKIE);
-  redirect("/login");
 }

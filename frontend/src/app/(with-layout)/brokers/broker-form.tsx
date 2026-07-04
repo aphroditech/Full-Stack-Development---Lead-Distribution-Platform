@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from "react";
 import type { Broker } from "@/lib/api-types";
 import { createBroker, updateBroker, type BrokerInput } from "./actions";
-import { Button, Field, Input, Toggle } from "@/components/ui/form";
-import { COMMON_TIMEZONES, WEEKDAYS } from "@/lib/timezones";
+import { Button, Field, Input, Select, Toggle } from "@/components/ui/form";
+import { WORLD_TIMEZONES, WEEKDAYS } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
 export function BrokerForm({
@@ -27,6 +27,11 @@ export function BrokerForm({
   );
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+
+  // Show the broker's current timezone even if it isn't in the curated list.
+  const timezoneOptions = WORLD_TIMEZONES.some((tz) => tz.value === timezone)
+    ? WORLD_TIMEZONES
+    : [{ value: timezone, label: timezone }, ...WORLD_TIMEZONES];
 
   function toggleDay(d: number) {
     setWorkingDays((prev) =>
@@ -72,7 +77,7 @@ export function BrokerForm({
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Daily cap" htmlFor="broker-cap">
           <Input
             id="broker-cap"
@@ -83,21 +88,21 @@ export function BrokerForm({
           />
         </Field>
         <Field label="Timezone" htmlFor="broker-tz">
-          <Input
+          <Select
             id="broker-tz"
-            list="tz-options"
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-          />
-          <datalist id="tz-options">
-            {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz} value={tz} />
+          >
+            {timezoneOptions.map((tz) => (
+              <option key={tz.value} value={tz.value}>
+                {tz.label}
+              </option>
             ))}
-          </datalist>
+          </Select>
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Opening time" htmlFor="broker-open">
           <Input
             id="broker-open"

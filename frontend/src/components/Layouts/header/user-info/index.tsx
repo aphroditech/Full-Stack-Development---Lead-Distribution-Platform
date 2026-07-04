@@ -24,6 +24,14 @@ function initials(name: string) {
 
 export function UserInfo({ user }: { user: AdminUser }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    await logoutAction();
+    // Hard navigation ensures the login page loads fresh and interactive.
+    window.location.href = "/login";
+  }
 
   return (
     <Dropdown isOpen={isOpen} setIsOpen={setIsOpen}>
@@ -62,15 +70,17 @@ export function UserInfo({ user }: { user: AdminUser }) {
         <hr className="border-[#E8E8E8] dark:border-dark-3" />
 
         <div className="p-2 text-base text-[#4B5563] dark:text-dark-6">
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2.25 outline-0 ring-primary hover:bg-gray-2 hover:text-dark focus-visible:ring-1 dark:hover:bg-dark-3 dark:hover:text-white"
-            >
-              <LogOutIcon />
-              <span className="text-base font-medium">Log out</span>
-            </button>
-          </form>
+          <button
+            type="button"
+            disabled={loggingOut}
+            onClick={handleLogout}
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2.25 outline-0 ring-primary hover:bg-gray-2 hover:text-dark focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-dark-3 dark:hover:text-white"
+          >
+            <LogOutIcon />
+            <span className="text-base font-medium">
+              {loggingOut ? "Logging out..." : "Log out"}
+            </span>
+          </button>
         </div>
       </DropdownContent>
     </Dropdown>
