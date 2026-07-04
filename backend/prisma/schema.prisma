@@ -1,0 +1,117 @@
+// Lead Distribution Platform — Prisma schema (MySQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// Admin account. The admin area is protected; public form pages are not.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+/// A broker that can receive leads. Many brokers can be created.
+model Broker {
+  id          String   @id @default(cuid())
+  name        String
+  active      Boolean  @default(true)
+  dailyCap    Int      @map("daily_cap")
+  timezone    String // IANA timezone, e.g. "Asia/Manila"
+  openingTime String   @map("opening_time") // "HH:mm"
+  closingTime String   @map("closing_time") // "HH:mm"
+  workingDays String   @map("working_days") // CSV of ISO weekdays 1..7 (Mon=1 .. Sun=7), e.g. "1,2,3,4,5"
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  distributionBrokers DistributionBroker[]
+  leads               Lead[]
+
+  @@map("brokers")
+}
+
+/// The single public lead form. Only one may exist.
+model Form {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  distribution Distribution?
+  leads        Lead[]
+
+  @@map("forms")
+}
+
+/// The single distribution, automatically bound to the one form. Only one may exist.
+model Distribution {
+  id        String   @id @default(cuid())
+  formId    String   @unique @map("form_id")
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  brokers DistributionBroker[]
+
+  @@map("distributions")
+}
+
+/// Per-broker settings inside the distribution (share % and active flag).
+model DistributionBroker {
+  id             String   @id @default(cuid())
+  distributionId String   @map("distribution_id")
+  brokerId       String   @map("broker_id")
+  percentage     Float    @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  distribution Distribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  broker       Broker       @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+
+  @@unique([distributionId, brokerId])
+  @@map("distribution_brokers")
+}
+
+enum LeadStatus {
+  sent
+  unsent
+  duplicate
+  failed
+}
+
+/// A captured lead submission.
+model Lead {
+  id               String     @id @default(cuid())
+  name             String
+  email            String // normalized: trimmed + lowercased
+  phone            String
+  ipAddress        String     @map("ip_address")
+  formId           String?    @map("form_id")
+  formName         String     @map("form_name")
+  assignedBrokerId String?    @map("assigned_broker_id")
+  status           LeadStatus @default(unsent)
+  assignedAt       DateTime?  @map("assigned_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  form   Form?   @relation(fields: [formId], references: [id], onDelete: SetNull)
+  broker Broker? @relation(fields: [assignedBrokerId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([assignedBrokerId])
+  @@index([status])
+  @@map("leads")
+}
