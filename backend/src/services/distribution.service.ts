@@ -114,6 +114,116 @@ export async function processLead(input: LeadInput): Promise<Lead> {
   });
 }
 
+export type StandingStatus = "next" | "eligible" | "inactive" | "capped" | "closed";
+
+export interface BrokerStanding {
+  brokerId: string;
+  name: string;
+  percentage: number;
+  sentToday: number;
+  dailyCap: number;
+  /** (totalSentToday + 1) * percentage / 100 — only for eligible brokers. */
+  targetAfterLead: number | null;
+  /** targetAfterLead - sentToday — only for eligible brokers. */
+  deficit: number | null;
+  eligible: boolean;
+  status: StandingStatus;
+  isNext: boolean;
+}
+
+export interface DistributionStandings {
+  totalSentToday: number;
+  brokers: BrokerStanding[];
+}
+
+/**
+ * Live view of how the next lead would be distributed right now: each broker's
+ * sent-today count, target share, deficit and eligibility. This is the runtime
+ * companion to the specification's example table — it makes the deficit
+ * algorithm visible without submitting a lead. Returns null when no
+ * distribution exists yet.
+ */
+export async function getDistributionStandings(): Promise<DistributionStandings | null> {
+  const form = await prisma.form.findFirst({
+    include: {
+      distribution: {
+        include: { brokers: { include: { broker: true }, orderBy: { createdAt: "asc" } } },
+      },
+    },
+  });
+
+  const distribution = form?.distribution;
+  if (!distribution) return null;
+
+  const now = DateTime.now();
+
+  const rows = await Promise.all(
+    distribution.brokers.map(async (db) => {
+      const broker = db.broker!;
+      const sentToday = await countBrokerSentToday(db.brokerId, broker.timezone);
+      const isCandidate = db.active && broker.active;
+      const open = isBrokerOpen(
+        {
+          timezone: broker.timezone,
+          openingTime: broker.openingTime,
+          closingTime: broker.closingTime,
+          workingDays: broker.workingDays,
+        },
+        now,
+      );
+      const underCap = sentToday < broker.dailyCap;
+
+      let status: StandingStatus;
+      let eligible = false;
+      if (!isCandidate) status = "inactive";
+      else if (!underCap) status = "capped";
+      else if (!open) status = "closed";
+      else {
+        status = "eligible";
+        eligible = true;
+      }
+
+      return { db, broker, sentToday, eligible, status };
+    }),
+  );
+
+  // Match processLead: totalSentToday sums brokers active in the distribution.
+  const candidates = rows.filter((r) => r.db.active && r.broker.active);
+  const totalSentToday = candidates.reduce((sum, r) => sum + r.sentToday, 0);
+
+  const eligibleRows = rows.filter((r) => r.eligible);
+  const selectedId = selectBroker(
+    eligibleRows.map((r) => ({
+      brokerId: r.db.brokerId,
+      percentage: r.db.percentage,
+      sentToday: r.sentToday,
+    })),
+    totalSentToday,
+  );
+
+  const brokers: BrokerStanding[] = rows.map((r) => {
+    const targetAfterLead = r.eligible
+      ? ((totalSentToday + 1) * r.db.percentage) / 100
+      : null;
+    const deficit = targetAfterLead === null ? null : targetAfterLead - r.sentToday;
+    const isNext = r.db.brokerId === selectedId;
+    return {
+      brokerId: r.db.brokerId,
+      name: r.broker.name,
+      percentage: r.db.percentage,
+      sentToday: r.sentToday,
+      dailyCap: r.broker.dailyCap,
+      targetAfterLead,
+      deficit,
+      eligible: r.eligible,
+      status: isNext ? "next" : r.status,
+      isNext,
+    };
+  });
+
+  return { totalSentToday, brokers };
+}
+
 /** Manually assign an unsent (or failed) lead to a broker — an explicit admin override. */
 export async function manuallyAssignLead(leadId: string, brokerId: string): Promise<Lead> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });

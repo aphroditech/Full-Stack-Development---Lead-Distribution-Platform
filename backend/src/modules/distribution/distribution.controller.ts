@@ -3,6 +3,7 @@ import type { Broker, Distribution, DistributionBroker, Form } from "@prisma/cli
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../lib/http-error";
 import { serializeBroker } from "../../utils/serialize";
+import { getDistributionStandings } from "../../services/distribution.service";
 import type { BrokerSetting } from "./distribution.schema";
 
 type FullDistribution = Distribution & {
@@ -48,6 +49,10 @@ export const getDistribution: RequestHandler = async (_req, res) => {
     distribution: distribution ? serializeDistribution(distribution) : null,
     leadStats: await leadStats(),
   });
+};
+
+export const getStandings: RequestHandler = async (_req, res) => {
+  res.json({ standings: await getDistributionStandings() });
 };
 
 export const createDistribution: RequestHandler = async (req, res) => {

@@ -60,6 +60,26 @@ export interface Distribution {
   brokers: DistributionBrokerSetting[];
 }
 
+export type StandingStatus = "next" | "eligible" | "inactive" | "capped" | "closed";
+
+export interface BrokerStanding {
+  brokerId: string;
+  name: string;
+  percentage: number;
+  sentToday: number;
+  dailyCap: number;
+  targetAfterLead: number | null;
+  deficit: number | null;
+  eligible: boolean;
+  status: StandingStatus;
+  isNext: boolean;
+}
+
+export interface DistributionStandings {
+  totalSentToday: number;
+  brokers: BrokerStanding[];
+}
+
 export interface LeadStats {
   total: number;
   sent: number;

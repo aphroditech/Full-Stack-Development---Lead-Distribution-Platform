@@ -1,10 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { backendJSON } from "@/lib/backend";
-import type { Broker, Distribution, FormInfo, LeadStats } from "@/lib/api-types";
+import type {
+  Broker,
+  Distribution,
+  DistributionStandings,
+  FormInfo,
+  LeadStats,
+} from "@/lib/api-types";
 import { Card, EmptyState, PageHeader } from "@/components/ui/display";
 import { Button } from "@/components/ui/form";
 import { DistributionEditor } from "./distribution-editor";
+import { DistributionStandingsTable } from "./distribution-standings";
 
 export const metadata: Metadata = { title: "Distribution" };
 
@@ -18,13 +25,17 @@ function StatPill({ label, value }: { label: string; value: number }) {
 }
 
 export default async function DistributionPage() {
-  const [{ distribution, leadStats }, { form }, { brokers }] = await Promise.all([
-    backendJSON<{ distribution: Distribution | null; leadStats: LeadStats }>(
-      "/api/distribution",
-    ),
-    backendJSON<{ form: FormInfo | null }>("/api/form"),
-    backendJSON<{ brokers: Broker[] }>("/api/brokers"),
-  ]);
+  const [{ distribution, leadStats }, { form }, { brokers }, { standings }] =
+    await Promise.all([
+      backendJSON<{ distribution: Distribution | null; leadStats: LeadStats }>(
+        "/api/distribution",
+      ),
+      backendJSON<{ form: FormInfo | null }>("/api/form"),
+      backendJSON<{ brokers: Broker[] }>("/api/brokers"),
+      backendJSON<{ standings: DistributionStandings | null }>(
+        "/api/distribution/standings",
+      ),
+    ]);
 
   return (
     <>
@@ -91,6 +102,7 @@ export default async function DistributionPage() {
             existing={distribution.brokers}
             mode="manage"
           />
+          {standings && <DistributionStandingsTable standings={standings} />}
         </div>
       )}
     </>

@@ -2,9 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { backendJSON } from "@/lib/backend";
-import type { Broker, Distribution, Lead, LeadStats } from "@/lib/api-types";
+import type {
+  Broker,
+  Distribution,
+  DistributionStandings,
+  Lead,
+  LeadStats,
+} from "@/lib/api-types";
 import { Card, PageHeader } from "@/components/ui/display";
 import { LeadsTable } from "@/components/leads-table";
+import { DistributionStandingsTable } from "../distribution-standings";
 
 export const metadata: Metadata = { title: "Distribution detail" };
 
@@ -18,13 +25,17 @@ function StatPill({ label, value }: { label: string; value: number }) {
 }
 
 export default async function DistributionDetailPage() {
-  const [{ distribution, leadStats }, { leads }, { brokers }] = await Promise.all([
-    backendJSON<{ distribution: Distribution | null; leadStats: LeadStats }>(
-      "/api/distribution",
-    ),
-    backendJSON<{ leads: Lead[] }>("/api/leads"),
-    backendJSON<{ brokers: Broker[] }>("/api/brokers"),
-  ]);
+  const [{ distribution, leadStats }, { leads }, { brokers }, { standings }] =
+    await Promise.all([
+      backendJSON<{ distribution: Distribution | null; leadStats: LeadStats }>(
+        "/api/distribution",
+      ),
+      backendJSON<{ leads: Lead[] }>("/api/leads"),
+      backendJSON<{ brokers: Broker[] }>("/api/brokers"),
+      backendJSON<{ standings: DistributionStandings | null }>(
+        "/api/distribution/standings",
+      ),
+    ]);
 
   if (!distribution) redirect("/distribution");
 
@@ -47,6 +58,12 @@ export default async function DistributionDetailPage() {
         <StatPill label="Duplicate" value={leadStats.duplicate} />
         <StatPill label="Failed" value={leadStats.failed} />
       </div>
+
+      {standings && (
+        <div className="mb-6">
+          <DistributionStandingsTable standings={standings} />
+        </div>
+      )}
 
       <LeadsTable leads={leads} brokers={brokers} canAssign showFilter />
     </>
